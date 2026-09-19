@@ -6,7 +6,7 @@ from pathlib import Path
 
 import pytest
 
-from makelib.version import (
+from src.makelib.version import (
     VersionError,
     bump_version,
     classify_branch_bump,
