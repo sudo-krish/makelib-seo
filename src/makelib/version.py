@@ -83,5 +83,5 @@ def update_project_version(
             d = json.loads(pkg_path.read_text(encoding="utf-8"))
             d["version"] = new_version
             pkg_path.write_text(json.dumps(d, indent=2) + "\n", encoding="utf-8")
-        except Exception:
-            pass
+        except Exception as e:
+            raise e
