@@ -131,13 +131,35 @@ jobs:
             fi
 
             echo "Classified bump type: $BUMP (from current version: $CURRENT_VER)"
-            NEW_VER=$(python3 -c "import sys; parts = [int(p) for p in '$CURRENT_VER'.split('.')]; bump = '$BUMP'; parts = [parts[0] + 1, 0, 0] if bump == 'major' else [parts[0], parts[1] + 1, 0] if bump == 'minor' else [parts[0], parts[1], parts[2] + 1]; print(f'{parts[0]}.{parts[1]}.{parts[2]}')")
+            NEW_VER=$(python3 -c "
+import sys
+parts = [int(p) for p in '$CURRENT_VER'.split('.')]
+bump = '$BUMP'
+if bump == 'major':
+    parts = [parts[0] + 1, 0, 0]
+elif bump == 'minor':
+    parts = [parts[0], parts[1] + 1, 0]
+else:
+    parts = [parts[0], parts[1], parts[2] + 1]
+print(f'{parts[0]}.{parts[1]}.{parts[2]}')
+")
             TAG="v${NEW_VER}"
             echo "Computed new SemVer release: $TAG"
 
             # Update pyproject.toml and package.json
-            python3 -c "import re; p = 'pyproject.toml'; c = open(p).read(); open(p, 'w').write(re.sub(r'^version\s*=\s*\".*?\"', 'version = \"$NEW_VER\"', c, flags=re.M))"
-            python3 -c "import json; pkg = 'package.json'; d = json.load(open(pkg)); d['version'] = '$NEW_VER'; json.dump(d, open(pkg, 'w'), indent=2)"
+            python3 -c "
+import re, json
+p = 'pyproject.toml'
+content = open(p).read()
+open(p, 'w').write(re.sub(r'^version\s*=\s*\".*?\"', 'version = \"$NEW_VER\"', content, flags=re.M))
+pkg = 'package.json'
+try:
+    d = json.load(open(pkg))
+    d['version'] = '$NEW_VER'
+    json.dump(d, open(pkg, 'w'), indent=2)
+except Exception:
+    pass
+"
           fi
 
           echo "tag=$TAG" >> "$GITHUB_OUTPUT"
