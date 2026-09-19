@@ -62,14 +62,7 @@ jobs:
           make init-makelib
 
       - name: Run Full Quality Gate Suite
-        run: |
-          make format
-          make lint
-          make type-check
-          make smell
-          make secret-scan
-          make license-check
-          make test MIN_COVERAGE=80
+        run: make check-all MIN_COVERAGE=80
 
   publish-release:
     name: Build & Publish GitHub Release
@@ -98,6 +91,8 @@ jobs:
       - name: Calculate Semantic Version Tag
         id: semver
         run: |
+          export PYTHONPATH=src
+
           # 1. Explicit tag name override provided
           if [ -n "${{ github.event.inputs.tag_name }}" ]; then
             TAG="${{ github.event.inputs.tag_name }}"
@@ -131,35 +126,12 @@ jobs:
             fi
 
             echo "Classified bump type: $BUMP (from current version: $CURRENT_VER)"
-            NEW_VER=$(python3 -c "
-import sys
-parts = [int(p) for p in '$CURRENT_VER'.split('.')]
-bump = '$BUMP'
-if bump == 'major':
-    parts = [parts[0] + 1, 0, 0]
-elif bump == 'minor':
-    parts = [parts[0], parts[1] + 1, 0]
-else:
-    parts = [parts[0], parts[1], parts[2] + 1]
-print(f'{parts[0]}.{parts[1]}.{parts[2]}')
-")
+            NEW_VER=$(python3 -c "from makelib.version import bump_version; print(bump_version('$CURRENT_VER', '$BUMP'))")
             TAG="v${NEW_VER}"
             echo "Computed new SemVer release: $TAG"
 
-            # Update pyproject.toml and package.json
-            python3 -c "
-import re, json
-p = 'pyproject.toml'
-content = open(p).read()
-open(p, 'w').write(re.sub(r'^version\s*=\s*\".*?\"', 'version = \"$NEW_VER\"', content, flags=re.M))
-pkg = 'package.json'
-try:
-    d = json.load(open(pkg))
-    d['version'] = '$NEW_VER'
-    json.dump(d, open(pkg, 'w'), indent=2)
-except Exception:
-    pass
-"
+            # Update version in workspace so build produces package with this version
+            python3 -c "from makelib.version import update_project_version; update_project_version('$NEW_VER')"
           fi
 
           echo "tag=$TAG" >> "$GITHUB_OUTPUT"
