@@ -24,9 +24,11 @@ PYTHON                ?= python3
 NPX                   ?= npx
 
 # Resolve location of this makefile (allows locating bundled tools and scripts)
-MAKELIB_SEO_DIR       ?= $(patsubst %/,%,$(dir $(lastword $(MAKEFILE_LIST))))
+MAKELIB_SEO_THIS_DIR  := $(patsubst %/,%,$(dir $(lastword $(MAKEFILE_LIST))))
+MAKELIB_SEO_DIR       ?= $(MAKELIB_SEO_THIS_DIR)
 HTML_VALIDATE_CONFIG  ?= $(if $(wildcard .htmlvalidate.json),.htmlvalidate.json,$(MAKELIB_SEO_DIR)/.htmlvalidate.json)
 SEO_CHECKER_BIN       ?= $(MAKELIB_SEO_DIR)/seo_checker.py
+
 
 # ------------------------------------------------------------------------------
 # Phony Targets Declaration
