@@ -38,7 +38,9 @@ def post_report() -> AuditReport:
 # ------------------------------------------------------------------------------
 class TestAuditReport:
     def test_report_summary_output(self, capsys: pytest.CaptureFixture[str]) -> None:
-        report = AuditReport(env="pre", target_url=DEV_URL, prod_domain=PROD_DOMAIN, strict=True)
+        report = AuditReport(
+            env="pre", target_url=DEV_URL, prod_domain=PROD_DOMAIN, strict=True
+        )
         report.add_pass("Check 1", "Passed detail")
         report.add_fail("Check 2", "Failed reason")
         report.add_warn("Check 3", "Warning reason")
@@ -64,7 +66,10 @@ class TestAuditReport:
 # ------------------------------------------------------------------------------
 class TestPreDeployAuditor:
     def test_accidental_noindex_clean(self, clean_report: AuditReport) -> None:
-        html = '<html><head><meta name="robots" content="index, follow"></head><body></body></html>'
+        html = (
+            '<html><head><meta name="robots" content="index, follow">'
+            "</head><body></body></html>"
+        )
         soup = BeautifulSoup(html, "html.parser")
         auditor = PreDeployAuditor(DEV_URL, PROD_DOMAIN, clean_report)
         auditor.check_accidental_noindex(soup)
@@ -72,7 +77,10 @@ class TestPreDeployAuditor:
         assert len(clean_report.passed) == 1
 
     def test_accidental_noindex_detected(self, clean_report: AuditReport) -> None:
-        html = '<html><head><meta name="robots" content="noindex, nofollow"></head><body></body></html>'
+        html = (
+            '<html><head><meta name="robots" content="noindex, nofollow">'
+            "</head><body></body></html>"
+        )
         soup = BeautifulSoup(html, "html.parser")
         auditor = PreDeployAuditor(DEV_URL, PROD_DOMAIN, clean_report)
         auditor.check_accidental_noindex(soup)
@@ -80,7 +88,10 @@ class TestPreDeployAuditor:
         assert "noindex" in clean_report.failed[0].lower()
 
     def test_canonical_url_valid(self, clean_report: AuditReport) -> None:
-        html = f'<html><head><link rel="canonical" href="{PROD_DOMAIN}/blog/post-1"></head></html>'
+        html = (
+            f'<html><head><link rel="canonical" href="{PROD_DOMAIN}/blog/post-1">'
+            "</head></html>"
+        )
         soup = BeautifulSoup(html, "html.parser")
         auditor = PreDeployAuditor(DEV_URL, PROD_DOMAIN, clean_report)
         auditor.check_canonical_url(soup)
@@ -227,7 +238,9 @@ class TestPreDeployAuditor:
 
     @responses.activate
     def test_sitemap_xml_parse_error(self, clean_report: AuditReport) -> None:
-        responses.add(responses.GET, f"{DEV_URL}/sitemap.xml", body="INVALID XML <<>>", status=200)
+        responses.add(
+            responses.GET, f"{DEV_URL}/sitemap.xml", body="INVALID XML <<>>", status=200
+        )
         auditor = PreDeployAuditor(DEV_URL, PROD_DOMAIN, clean_report)
         auditor.check_sitemap_xml()
         assert len(clean_report.failed) == 1
@@ -235,7 +248,12 @@ class TestPreDeployAuditor:
 
     @responses.activate
     def test_sitemap_xml_no_locs(self, clean_report: AuditReport) -> None:
-        responses.add(responses.GET, f"{DEV_URL}/sitemap.xml", body="<urlset></urlset>", status=200)
+        responses.add(
+            responses.GET,
+            f"{DEV_URL}/sitemap.xml",
+            body="<urlset></urlset>",
+            status=200,
+        )
         auditor = PreDeployAuditor(DEV_URL, PROD_DOMAIN, clean_report)
         auditor.check_sitemap_xml()
         assert len(clean_report.failed) == 1
@@ -246,24 +264,36 @@ class TestPreDeployAuditor:
             "@context": "https://schema.org",
             "@graph": [
                 {"@type": "Organization", "name": "Test Org"},
-                {"@type": "Person", "name": "Alice", "sameAs": ["https://linkedin.com/in/alice"]},
+                {
+                    "@type": "Person",
+                    "name": "Alice",
+                    "sameAs": ["https://linkedin.com/in/alice"],
+                },
                 {"@type": "Article", "headline": "SEO Best Practices"},
             ],
         }
-        html = f'<html><head><script type="application/ld+json">{json.dumps(payload)}</script></head></html>'
+        html = (
+            '<html><head><script type="application/ld+json">'
+            f"{json.dumps(payload)}</script></head></html>"
+        )
         soup = BeautifulSoup(html, "html.parser")
         auditor = PreDeployAuditor(DEV_URL, PROD_DOMAIN, clean_report)
         auditor.check_json_ld_schemas(soup)
         assert len(clean_report.failed) == 0
         assert len(clean_report.passed) == 1
 
-    def test_json_ld_schemas_missing_person_sameas(self, clean_report: AuditReport) -> None:
+    def test_json_ld_schemas_missing_person_sameas(
+        self, clean_report: AuditReport
+    ) -> None:
         payload = [
             {"@type": "Organization", "name": "Test Org"},
             {"@type": "Person", "name": "Alice"},  # missing sameAs
             {"@type": "Article", "headline": "SEO Best Practices"},
         ]
-        html = f'<html><head><script type="application/ld+json">{json.dumps(payload)}</script></head></html>'
+        html = (
+            '<html><head><script type="application/ld+json">'
+            f"{json.dumps(payload)}</script></head></html>"
+        )
         soup = BeautifulSoup(html, "html.parser")
         auditor = PreDeployAuditor(DEV_URL, PROD_DOMAIN, clean_report)
         auditor.check_json_ld_schemas(soup)
@@ -276,10 +306,15 @@ class TestPreDeployAuditor:
         auditor = PreDeployAuditor(DEV_URL, PROD_DOMAIN, clean_report)
         auditor.check_json_ld_schemas(soup)
         assert len(clean_report.failed) == 1
-        assert 'no <script type="application/ld+json">' in clean_report.failed[0].lower()
+        assert (
+            'no <script type="application/ld+json">' in clean_report.failed[0].lower()
+        )
 
     def test_json_ld_invalid_json(self, clean_report: AuditReport) -> None:
-        html = '<html><head><script type="application/ld+json">{broken-json</script></head></html>'
+        html = (
+            '<html><head><script type="application/ld+json">'
+            "{broken-json</script></head></html>"
+        )
         soup = BeautifulSoup(html, "html.parser")
         auditor = PreDeployAuditor(DEV_URL, PROD_DOMAIN, clean_report)
         auditor.check_json_ld_schemas(soup)
@@ -291,7 +326,8 @@ class TestPreDeployAuditor:
         <html>
         <body>
           <p>
-            I tested this tool on the web. We tested the fast page. In my experience it is very easy to use.
+            I tested this tool on the web. We tested the fast page.
+            In my experience it is very easy to use.
             Our data shows great speed. My analysis proves it works well.
           </p>
         </body>
@@ -304,13 +340,16 @@ class TestPreDeployAuditor:
         assert len(clean_report.warnings) == 0
         assert len(clean_report.passed) >= 2
 
-    def test_content_readability_warning_and_missing_markers(self, clean_report: AuditReport) -> None:
+    def test_content_readability_warning_and_missing_markers(
+        self, clean_report: AuditReport
+    ) -> None:
         html = """
         <html>
         <body>
           <p>
-            The psycho-pathological manifestations of multifaceted socioeconomic institutionalizations
-            substantiate an incomprehensibly convoluted counter-intuitive epistemological paradigm.
+            The psycho-pathological manifestations of multifaceted socioeconomic
+            institutionalizations substantiate an incomprehensibly convoluted
+            counter-intuitive epistemological paradigm.
           </p>
         </body>
         </html>
@@ -372,7 +411,9 @@ class TestPostDeployAuditor:
 
         mock_session.get.return_value = mock_response
 
-        auditor = PostDeployAuditor(PROD_DOMAIN, PROD_DOMAIN, post_report, session=mock_session)
+        auditor = PostDeployAuditor(
+            PROD_DOMAIN, PROD_DOMAIN, post_report, session=mock_session
+        )
         auditor.check_http_to_https_redirect()
         assert len(post_report.failed) == 0
         assert len(post_report.passed) == 1
@@ -385,7 +426,9 @@ class TestPostDeployAuditor:
         mock_response.history = []
         mock_session.get.return_value = mock_response
 
-        auditor = PostDeployAuditor(PROD_DOMAIN, PROD_DOMAIN, post_report, session=mock_session)
+        auditor = PostDeployAuditor(
+            PROD_DOMAIN, PROD_DOMAIN, post_report, session=mock_session
+        )
         auditor.check_http_to_https_redirect()
         assert len(post_report.failed) == 1
 
@@ -400,7 +443,9 @@ class TestPostDeployAuditor:
         mock_response.history = [hist_resp]
         mock_session.get.return_value = mock_response
 
-        auditor = PostDeployAuditor("https://example.com/", PROD_DOMAIN, post_report, session=mock_session)
+        auditor = PostDeployAuditor(
+            "https://example.com/", PROD_DOMAIN, post_report, session=mock_session
+        )
         auditor.check_www_resolution()
         assert len(post_report.passed) == 1
 
@@ -416,18 +461,30 @@ class TestPostDeployAuditor:
         mock_response.headers = {"Location": "/pricing"}
         mock_session.get.return_value = mock_response
 
-        auditor = PostDeployAuditor("https://example.com/pricing", PROD_DOMAIN, post_report, session=mock_session)
+        auditor = PostDeployAuditor(
+            "https://example.com/pricing",
+            PROD_DOMAIN,
+            post_report,
+            session=mock_session,
+        )
         auditor.check_trailing_slash_strictness()
         assert len(post_report.failed) == 0
         assert len(post_report.passed) == 1
 
-    def test_trailing_slash_duplicate_200_failure(self, post_report: AuditReport) -> None:
+    def test_trailing_slash_duplicate_200_failure(
+        self, post_report: AuditReport
+    ) -> None:
         mock_session = MagicMock()
         mock_response = MagicMock()
         mock_response.status_code = 200
         mock_session.get.return_value = mock_response
 
-        auditor = PostDeployAuditor("https://example.com/pricing", PROD_DOMAIN, post_report, session=mock_session)
+        auditor = PostDeployAuditor(
+            "https://example.com/pricing",
+            PROD_DOMAIN,
+            post_report,
+            session=mock_session,
+        )
         auditor.check_trailing_slash_strictness()
         assert len(post_report.failed) == 1
         assert "duplicate 200" in post_report.failed[0].lower()
@@ -443,7 +500,9 @@ class TestPostDeployAuditor:
         mock_response.history = [hist]
         mock_session.get.return_value = mock_response
 
-        auditor = PostDeployAuditor(PROD_DOMAIN, PROD_DOMAIN, post_report, session=mock_session)
+        auditor = PostDeployAuditor(
+            PROD_DOMAIN, PROD_DOMAIN, post_report, session=mock_session
+        )
         auditor.run_all()
         assert len(post_report.passed) >= 3
 
@@ -464,7 +523,9 @@ class TestEndToEndMockIntegration:
         cls.server.stop()
 
     def test_e2e_pre_deployment_pass(self) -> None:
-        report = AuditReport(env="pre", target_url=self.server.url, prod_domain=PROD_DOMAIN)
+        report = AuditReport(
+            env="pre", target_url=self.server.url, prod_domain=PROD_DOMAIN
+        )
         auditor = PreDeployAuditor(self.server.url, PROD_DOMAIN, report)
         auditor.run_all()
         assert not report.has_failed
@@ -473,7 +534,16 @@ class TestEndToEndMockIntegration:
 
     def test_cli_execution_pre(self) -> None:
         with patch(
-            "sys.argv", ["seo_checker.py", "--url", self.server.url, "--env", "pre", "--prod-domain", PROD_DOMAIN]
+            "sys.argv",
+            [
+                "seo_checker.py",
+                "--url",
+                self.server.url,
+                "--env",
+                "pre",
+                "--prod-domain",
+                PROD_DOMAIN,
+            ],
         ):
             with pytest.raises(SystemExit) as excinfo:
                 main()
@@ -482,7 +552,16 @@ class TestEndToEndMockIntegration:
     def test_cli_execution_post_mocked(self) -> None:
         with patch("src.seo_checker.PostDeployAuditor.run_all"):
             with patch(
-                "sys.argv", ["seo_checker.py", "--url", PROD_DOMAIN, "--env", "post", "--prod-domain", PROD_DOMAIN]
+                "sys.argv",
+                [
+                    "seo_checker.py",
+                    "--url",
+                    PROD_DOMAIN,
+                    "--env",
+                    "post",
+                    "--prod-domain",
+                    PROD_DOMAIN,
+                ],
             ):
                 with pytest.raises(SystemExit) as excinfo:
                     main()
@@ -493,10 +572,21 @@ class TestEndToEndMockIntegration:
         def fake_run(self_auditor: PreDeployAuditor) -> None:
             self_auditor.report.add_warn("Readability", "Low score")
 
-        with patch.object(PreDeployAuditor, "run_all", side_effect=fake_run, autospec=True):
+        with patch.object(
+            PreDeployAuditor, "run_all", side_effect=fake_run, autospec=True
+        ):
             with patch(
                 "sys.argv",
-                ["seo_checker.py", "--url", self.server.url, "--env", "pre", "--prod-domain", PROD_DOMAIN, "--strict"],
+                [
+                    "seo_checker.py",
+                    "--url",
+                    self.server.url,
+                    "--env",
+                    "pre",
+                    "--prod-domain",
+                    PROD_DOMAIN,
+                    "--strict",
+                ],
             ):
                 with pytest.raises(SystemExit) as excinfo:
                     main()
