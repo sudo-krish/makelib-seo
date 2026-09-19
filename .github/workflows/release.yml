@@ -46,10 +46,10 @@ jobs:
           python-version: "3.12"
           cache: "pip"
 
-      - name: Set up Node.js 20
+      - name: Set up Node.js 22
         uses: actions/setup-node@v4
         with:
-          node-version: "20"
+          node-version: "22"
           cache: "npm"
 
       - name: Install Toolchain & Dependencies
@@ -86,10 +86,10 @@ jobs:
         with:
           python-version: "3.12"
 
-      - name: Set up Node.js 20
+      - name: Set up Node.js 22
         uses: actions/setup-node@v4
         with:
-          node-version: "20"
+          node-version: "22"
 
       - name: Install Build Tools
         run: |
