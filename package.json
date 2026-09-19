@@ -7,6 +7,7 @@
     "lychee": "bin/lychee.js"
   },
   "scripts": {
+    "build": "echo 'makelib-seo: no compilation required'",
     "validate:html": "html-validate",
     "validate:llms": "llms-txt-validator ./llms.txt",
     "audit:seo": "python3 seo_checker.py"
