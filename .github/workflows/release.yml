@@ -1,0 +1,193 @@
+name: Release
+
+on:
+  push:
+    branches:
+      - main
+    tags:
+      - "v*.*.*"
+      - "v*"
+  workflow_dispatch:
+    inputs:
+      bump_type:
+        description: "SemVer bump type (auto, patch, minor, major)"
+        required: true
+        default: "auto"
+        type: choice
+        options:
+          - auto
+          - patch
+          - minor
+          - major
+      tag_name:
+        description: "Explicit tag override (optional, e.g. v1.0.0)"
+        required: false
+        default: ""
+
+permissions:
+  contents: write
+  id-token: write
+
+concurrency:
+  group: release-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  verify:
+    name: Verify Release Quality Gate
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python 3.12
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: "pip"
+
+      - name: Set up Node.js 20
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          cache: "npm"
+
+      - name: Install Toolchain & Dependencies
+        run: |
+          python -m pip install --upgrade pip uv build
+          uv venv .venv
+          uv pip install -r requirements.txt -r requirements-dev.txt
+          npm ci || npm install
+          mkdir -p node_modules/.bin && ln -sf ../../bin/lychee.js node_modules/.bin/lychee
+          make init-makelib
+
+      - name: Run Full Quality Gate Suite
+        run: |
+          make format
+          make lint
+          make type-check
+          make smell
+          make secret-scan
+          make license-check
+          make test MIN_COVERAGE=80
+
+  publish-release:
+    name: Build & Publish GitHub Release
+    needs: verify
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Set up Python 3.12
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Set up Node.js 20
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+
+      - name: Install Build Tools
+        run: |
+          python -m pip install --upgrade pip build
+
+      - name: Calculate Semantic Version Tag
+        id: semver
+        run: |
+          # 1. Explicit tag name override provided
+          if [ -n "${{ github.event.inputs.tag_name }}" ]; then
+            TAG="${{ github.event.inputs.tag_name }}"
+            echo "Explicit tag provided: $TAG"
+          # 2. Triggered by explicit git tag push
+          elif [[ "${{ github.ref }}" == refs/tags/v* ]]; then
+            TAG="${{ github.ref_name }}"
+            echo "Triggered by tag push: $TAG"
+          # 3. Triggered by push/merge to main branch
+          else
+            LATEST_TAG=$(git describe --tags --abbrev=0 --match "v[0-9]*" 2>/dev/null || echo "")
+            if [ -n "$LATEST_TAG" ]; then
+              CURRENT_VER="${LATEST_TAG#v}"
+            else
+              CURRENT_VER=$(python3 -c 'import tomllib; print(tomllib.load(open("pyproject.toml", "rb"))["project"]["version"])')
+            fi
+
+            INPUT_BUMP="${{ github.event.inputs.bump_type }}"
+            if [ -n "$INPUT_BUMP" ] && [ "$INPUT_BUMP" != "auto" ]; then
+              BUMP="$INPUT_BUMP"
+            else
+              COMMIT_LOG=$(git log -1 --pretty=%B)
+              echo "Inspecting merge commit message: $COMMIT_LOG"
+              if echo "$COMMIT_LOG" | grep -qiE "(major/|breaking/|BREAKING CHANGE|feat!:)"; then
+                BUMP="major"
+              elif echo "$COMMIT_LOG" | grep -qiE "(feat/|feature/|^feat(\(.*\))?:)"; then
+                BUMP="minor"
+              else
+                BUMP="patch"
+              fi
+            fi
+
+            echo "Classified bump type: $BUMP (from current version: $CURRENT_VER)"
+            NEW_VER=$(python3 -c "
+import sys
+parts = [int(p) for p in '$CURRENT_VER'.split('.')]
+bump = '$BUMP'
+if bump == 'major':
+    parts = [parts[0] + 1, 0, 0]
+elif bump == 'minor':
+    parts = [parts[0], parts[1] + 1, 0]
+else:
+    parts = [parts[0], parts[1], parts[2] + 1]
+print(f'{parts[0]}.{parts[1]}.{parts[2]}')
+")
+            TAG="v${NEW_VER}"
+            echo "Computed new SemVer release: $TAG"
+
+            # Update pyproject.toml and package.json
+            python3 -c "
+import re, json
+p = 'pyproject.toml'
+content = open(p).read()
+open(p, 'w').write(re.sub(r'^version\s*=\s*\".*?\"', 'version = \"$NEW_VER\"', content, flags=re.M))
+pkg = 'package.json'
+try:
+    d = json.load(open(pkg))
+    d['version'] = '$NEW_VER'
+    json.dump(d, open(pkg, 'w'), indent=2)
+except Exception:
+    pass
+"
+          fi
+
+          echo "tag=$TAG" >> "$GITHUB_OUTPUT"
+
+          # Tag commit and push to remote
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          if ! git rev-parse "$TAG" >/dev/null 2>&1; then
+            git tag -a "$TAG" -m "Automated release $TAG"
+            git push origin "$TAG"
+          fi
+
+      - name: Build Source and Wheel Distributions
+        run: |
+          python -m build
+
+      - name: Generate SHA256 Checksums
+        run: |
+          cd dist
+          sha256sum * > SHA256SUMS.txt
+          cat SHA256SUMS.txt
+
+      - name: Create GitHub Release & Attach Artifacts
+        uses: softprops/action-gh-release@v2
+        with:
+          files: |
+            dist/*
+          generate_release_notes: true
+          draft: false
+          prerelease: false
+          tag_name: ${{ steps.semver.outputs.tag }}

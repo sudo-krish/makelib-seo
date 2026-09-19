@@ -1,0 +1,28 @@
+{
+  "extends": [
+    "html-validate:recommended"
+  ],
+  "rules": {
+    "heading-level": [
+      "error",
+      {
+        "allowMultipleH1": false,
+        "minInitialRank": "h1"
+      }
+    ],
+    "wcag/h37": "error",
+    "require-sri": "off",
+    "no-inline-style": "off",
+    "element-required-attributes": [
+      "error",
+      {
+        "img": ["alt"],
+        "html": ["lang"]
+      }
+    ],
+    "doctype-html": "error",
+    "no-dup-id": "error",
+    "attr-delimiter": "error",
+    "valid-id": "error"
+  }
+}

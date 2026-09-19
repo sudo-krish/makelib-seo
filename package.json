@@ -1,0 +1,32 @@
+{
+  "name": "makelib-seo",
+  "version": "0.1.0",
+  "description": "A drop-in Makefile library for CI/CD pipelines enforcing Technical SEO, GEO, and Core Web Vitals",
+  "main": "index.js",
+  "bin": {
+    "lychee": "bin/lychee.js"
+  },
+  "scripts": {
+    "validate:html": "html-validate",
+    "validate:llms": "llms-txt-validator ./llms.txt",
+    "audit:seo": "python3 seo_checker.py"
+  },
+  "keywords": [
+    "seo",
+    "geo",
+    "makelib",
+    "ci-cd",
+    "pipeline",
+    "web-vitals",
+    "unlighthouse",
+    "html-validate",
+    "llms-txt"
+  ],
+  "author": "sudo-krish",
+  "license": "Apache-2.0",
+  "dependencies": {
+    "@bridgetoagent-com/llms-txt-validator": "^0.1.0",
+    "html-validate": "^11.16.0",
+    "unlighthouse": "^0.18.0"
+  }
+}
