@@ -1,0 +1,62 @@
+# ==============================================================================
+# Lefthook Configuration (https://github.com/evilmartians/lefthook)
+# ==============================================================================
+# Enforces branch naming convention on commit and quality gates on push.
+
+pre-commit:
+  parallel: false
+  commands:
+    branch-name-lint:
+      run: |
+        branch=$(git symbolic-ref --short HEAD 2>/dev/null || echo "")
+        if [ -z "$branch" ]; then
+          exit 0
+        fi
+        if [ "$branch" = "main" ]; then
+          echo "========================================================================"
+          echo "ERROR: Commits directly to 'main' are prohibited!"
+          echo "Branch protection policy requires committing to a classified feature branch:"
+          echo "  git checkout -b feat/my-feature-name"
+          echo "========================================================================"
+          exit 1
+        fi
+        regex="^(feat|feature|fix|patch|major|breaking|docs|chore|refactor|ci)/[a-z0-9._-]+$"
+        if [[ ! "$branch" =~ $regex ]]; then
+          echo "========================================================================"
+          echo "ERROR: Branch '$branch' violates branch naming policy!"
+          echo "Cannot commit to unclassified branch. Branch names must start with:"
+          echo "  - major/<name> or breaking/<name> (Breaking changes -> MAJOR bump)"
+          echo "  - feat/<name>  or feature/<name>  (New features    -> MINOR bump)"
+          echo "  - fix/<name>   or patch/<name>    (Bug fixes       -> PATCH bump)"
+          echo "  - docs/<name>  or chore/<name>    (Documentation / chore -> PATCH)"
+          echo "  - refactor/<name> or ci/<name>    (Refactor / CI updates -> PATCH)"
+          echo ""
+          echo "Allowed characters after prefix: lowercase alphanumeric, dashes, dots, underscores."
+          echo "========================================================================"
+          exit 1
+        fi
+
+pre-push:
+  parallel: false
+  commands:
+    branch-name-lint:
+      run: |
+        branch=$(git symbolic-ref --short HEAD 2>/dev/null || echo "")
+        if [ -z "$branch" ]; then
+          exit 0
+        fi
+        if [ "$branch" = "main" ]; then
+          echo "========================================================================"
+          echo "ERROR: Direct pushes to 'main' are prohibited!"
+          echo "========================================================================"
+          exit 1
+        fi
+        regex="^(feat|feature|fix|patch|major|breaking|docs|chore|refactor|ci)/[a-z0-9._-]+$"
+        if [[ ! "$branch" =~ $regex ]]; then
+          echo "========================================================================"
+          echo "ERROR: Branch '$branch' violates branch naming policy!"
+          echo "========================================================================"
+          exit 1
+        fi
+    quality-gate:
+      run: make check-all

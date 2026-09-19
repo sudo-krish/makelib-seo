@@ -1,0 +1,14 @@
+# makelib-seo
+
+> makelib-seo is a drop-in Makefile toolkit for CI/CD pipelines that enforces Technical SEO, AI-Search readiness (GEO), and Core Web Vitals on pre- and post-deployment environments.
+
+## Documentation & Usage
+
+- [Repository Source](https://github.com/sudo-krish/makelib-seo): Source code and issue tracking for the project.
+- [Downstream Integration Guide](https://github.com/sudo-krish/makelib-seo#downstream-integration): Instructions on bootstrapping makelib-seo into existing web projects.
+- [Pre-Deployment Gate Reference](https://github.com/sudo-krish/makelib-seo#pre-deployment-checks): Complete reference of rules evaluated during local CI server testing.
+- [Post-Deployment Gate Reference](https://github.com/sudo-krish/makelib-seo#post-deployment-checks): Specification of live edge CDN and redirect rules.
+
+## Optional
+
+- [makelib-py](https://github.com/sudo-krish/makelib-py): Standardized Python quality gates and security tooling library.

@@ -1,0 +1,148 @@
+name: CI
+
+on:
+  push:
+    branches: [ main ]
+  pull_request:
+    branches: [ main ]
+  workflow_dispatch:
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  branch-name-lint:
+    name: Verify Branch Naming Policy
+    runs-on: ubuntu-latest
+    if: github.event_name == 'pull_request'
+    steps:
+      - name: Validate PR branch naming classification
+        run: |
+          BRANCH="${{ github.head_ref }}"
+          REGEX="^(feat|feature|fix|patch|major|breaking|docs|chore|refactor|ci)/[a-z0-9._-]+$"
+          if [[ ! "$BRANCH" =~ $REGEX ]]; then
+            echo "========================================================================"
+            echo "ERROR: Branch '$BRANCH' violates repository branch naming standard!"
+            echo "All PR branches must start with a classification prefix:"
+            echo "  - major/* or breaking/* -> Major release (X.0.0)"
+            echo "  - feat/*  or feature/*  -> Minor release (0.X.0)"
+            echo "  - fix/*, patch/*, docs/*, chore/*, refactor/*, ci/* -> Patch release (0.0.X)"
+            echo "========================================================================"
+            exit 1
+          fi
+          echo "Branch '$BRANCH' complies with naming policy."
+
+  quality-gate:
+    name: Quality Gate (Python ${{ matrix.python-version }})
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        python-version: ["3.14"]
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python ${{ matrix.python-version }}
+        uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python-version }}
+          cache: "pip"
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: "npm"
+
+      - name: Install uv & Python Toolchain
+        run: |
+          python -m pip install --upgrade pip uv
+          uv venv .venv
+          uv pip install -r requirements.txt -r requirements-dev.txt
+
+      - name: Install Node Dependencies
+        run: |
+          npm ci || npm install
+          mkdir -p node_modules/.bin && ln -sf ../../bin/lychee.js node_modules/.bin/lychee
+
+      - name: Bootstrap makelib-py Toolchain
+        run: make init-makelib
+
+      - name: Run Ruff Lint Checks
+        run: make lint
+
+      - name: Run Mypy Strict Type Checks
+        run: make type-check
+
+      - name: Run Code Smell & Bandit Security AST Scans
+        run: make smell
+
+      - name: Run Secret Scanning
+        run: make secret-scan
+
+      - name: Run Dependency License Audit
+        run: make license-check
+
+      - name: Run Pytest & Enforce Coverage Threshold
+        run: make test MIN_COVERAGE=80
+
+  seo-self-test:
+    name: SEO & GEO Self-Verification Gate
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python 3.12
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Set up Node.js 22
+        uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+
+      - name: Install Dependencies
+        run: |
+          python -m pip install --upgrade pip uv
+          uv venv .venv
+          uv pip install -r requirements.txt -r requirements-dev.txt
+          npm ci || npm install
+          mkdir -p node_modules/.bin && ln -sf ../../bin/lychee.js node_modules/.bin/lychee
+          make init-makelib
+
+      - name: Start Mock Dev Server Fixture
+        run: |
+          .venv/bin/python tests/mock_server.py 3000 &
+          sleep 2
+          curl -sI http://localhost:3000/ || exit 1
+
+      - name: Run Pre-Deployment Quality Pipeline (Local Fixture)
+        run: |
+          make test-pre DEV_URL=http://localhost:3000 PROD_DOMAIN=https://example.com
+
+  ci-success:
+    name: CI Check Status
+    needs: [quality-gate, branch-name-lint, seo-self-test]
+    runs-on: ubuntu-latest
+    if: always()
+    steps:
+      - name: Verify all checks passed
+        run: |
+          if [ "${{ needs.quality-gate.result }}" != "success" ]; then
+            echo "Quality gate failed!"
+            exit 1
+          fi
+          if [ "${{ needs.seo-self-test.result }}" != "success" ]; then
+            echo "SEO self-test failed!"
+            exit 1
+          fi
+          if [ "${{ needs.branch-name-lint.result }}" == "failure" ]; then
+            echo "Branch name check failed!"
+            exit 1
+          fi
+          echo "All CI quality, SEO self-tests, and naming checks passed successfully."

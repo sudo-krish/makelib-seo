@@ -1,0 +1,51 @@
+# ==============================================================================
+# Example Downstream CI Workflow: Post-Deployment Edge & Header Routing Gate
+# ==============================================================================
+# Copy this workflow into your downstream web project (.github/workflows/seo-post-deploy.yml)
+# to run after production cutover, asserting HTTPS 301, canonical hosts, trailing slash,
+# and X-Robots-Tag CDN headers.
+# ==============================================================================
+
+name: Post-Deployment Edge Gate
+
+on:
+  push:
+    branches: [main]
+  # Or triggered by deployment event / webhook
+  deployment_status:
+  workflow_dispatch:
+    inputs:
+      prod_domain:
+        description: "Production domain to test (e.g. https://example.com)"
+        required: true
+        default: "https://example.com"
+
+concurrency:
+  group: seo-post-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  seo-post-deploy:
+    name: Post-Deployment Edge & Header Audit
+    if: github.event_name != 'deployment_status' || github.event.deployment_status.state == 'success'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python 3.12
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: "pip"
+
+      - name: Bootstrap makelib-seo Toolchain
+        run: |
+          make init-makelib-seo
+          pip install requests
+
+      - name: Run Live Edge Routing & CDN Header Guards
+        env:
+          PROD_DOMAIN: ${{ github.event.inputs.prod_domain || 'https://example.com' }}
+        run: |
+          make test-post PROD_DOMAIN="$PROD_DOMAIN"

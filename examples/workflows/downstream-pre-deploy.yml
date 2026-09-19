@@ -1,0 +1,58 @@
+# ==============================================================================
+# Example Downstream CI Workflow: Pre-Deployment SEO & GEO Quality Gate
+# ==============================================================================
+# Copy this workflow into your downstream web project (.github/workflows/seo-pre-deploy.yml)
+# to automatically run HTML, LLMs.txt, link health, Unlighthouse, and GEO audits on PRs.
+# ==============================================================================
+
+name: Pre-Deployment SEO Gate
+
+on:
+  pull_request:
+    branches: [main]
+  workflow_dispatch:
+
+concurrency:
+  group: seo-pre-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  seo-pre-deploy:
+    name: Pre-Deployment SEO & GEO Validation
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js 22
+        uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: "npm"
+
+      - name: Set up Python 3.12
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: "pip"
+
+      - name: Install Application Dependencies & Build Assets
+        run: |
+          npm ci
+          npm run build
+
+      - name: Start Local Preview Web Server
+        run: |
+          # Start preview server in background on port 3000 (adjust command as needed)
+          npm run preview -- --port 3000 &
+          npx wait-on http://localhost:3000 --timeout 60000
+
+      - name: Bootstrap makelib-seo Toolchain
+        run: |
+          make init-makelib-seo
+          # Install makelib-seo dependencies into local environment
+          cd .makelib-seo && npm ci && cd ..
+
+      - name: Run Pre-Deployment Quality Gates
+        run: |
+          make test-pre DEV_URL=http://localhost:3000 PROD_DOMAIN=https://example.com
