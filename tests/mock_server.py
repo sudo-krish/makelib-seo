@@ -87,6 +87,7 @@ class MockSEOHandler(http.server.SimpleHTTPRequestHandler):
             for k, v in headers.items():
                 self.send_header(k, v)
             self.send_header("Content-Length", str(len(content)))
+            self.send_header("Connection", "close")
             self.end_headers()
             self.wfile.write(content)
             return
@@ -94,19 +95,27 @@ class MockSEOHandler(http.server.SimpleHTTPRequestHandler):
         if path == "/pricing/":
             self.send_response(301)
             self.send_header("Location", "/pricing")
+            self.send_header("Connection", "close")
             self.end_headers()
         elif path.startswith("/http-to-https"):
             self.send_response(301)
             self.send_header("Location", "https://example.com" + path)
+            self.send_header("Connection", "close")
             self.end_headers()
         else:
             self.send_response(404)
+            self.send_header("Connection", "close")
             self.end_headers()
+
+
+class ThreadingServer(socketserver.ThreadingMixIn, socketserver.TCPServer):
+    daemon_threads = True
+    allow_reuse_address = True
 
 
 class MockServer:
     def __init__(self, port: int = 0) -> None:
-        self.server = socketserver.TCPServer(("127.0.0.1", port), MockSEOHandler)
+        self.server = ThreadingServer(("127.0.0.1", port), MockSEOHandler)
         self.port: int = self.server.server_address[1]
         self._thread: threading.Thread | None = None
 
